@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-v1.1 代表PDFでキャリア追記し、TL_DATA を再計算
+v1.2 代表PDFでキャリア追記し、TL_DATA を再計算
 - 追加: 令和4-8の政権名（代表日時点）、年表カラムに財務官
+- 追加: 幹部名簿に載らない税関長等を CAREER_OVERRIDES で補完
 - 継承: 既存 career は上書きしない。R5-R8は新規、R4は空欄のみ補充
 - 新出氏名は unmatched のまま DATA に追加しない
 """
@@ -63,6 +64,11 @@ VERIFY_FY = {
     "令和３年度": date(2021, 8, 1),
     "令和４年度": date(2022, 8, 1),
 }
+
+# 財務省幹部名簿に税関長は載らない。代表PDF日時点の外局ポストを手補完する。
+CAREER_OVERRIDES = [
+    {"id": 1967, "fy": "令和８年度", "post": "東京税関長"},
+]
 
 
 def load_json(path: Path):
@@ -143,6 +149,25 @@ def rebuild_latest_fields(person: dict) -> None:
     else:
         person["p"] = ""
         person["fy"] = ""
+
+
+def apply_career_overrides(people: dict[int, dict]) -> int:
+    n = 0
+    for ov in CAREER_OVERRIDES:
+        person = people.get(ov["id"])
+        if not person:
+            continue
+        fy = ov["fy"]
+        post = clean_post(ov["post"])
+        career = person.setdefault("career", [])
+        existing = next((c for c in career if (c.get("年度") or "") == fy), None)
+        if existing:
+            existing["ポスト"] = post
+        else:
+            career.insert(0, {"年度": fy, "ポスト": post})
+        rebuild_latest_fields(person)
+        n += 1
+    return n
 
 
 def load_original_tl() -> dict:
@@ -265,6 +290,8 @@ def main(out_dir: Path) -> None:
         for person in people.values():
             rebuild_latest_fields(person)
 
+    n_override = apply_career_overrides(people)
+
     # R2-R4 verification
     verify_rows = []
     for fy, _target in VERIFY_FY.items():
@@ -340,6 +367,7 @@ def main(out_dir: Path) -> None:
         {
             "people": len(out_data),
             "career_years_added": added,
+            "career_overrides": n_override,
             "skipped_existing": skipped_existing,
             "apply_fys": apply_fys,
             "r2_r4_diff": len(verify_rows),
@@ -348,7 +376,7 @@ def main(out_dir: Path) -> None:
             "rep": {fy: chosen[fy]["file"] for fy in sorted(chosen)},
         },
     )
-    print("added", added, "r2_r4_diff", len(verify_rows), "new_names", len(new_names))
+    print("added", added, "overrides", n_override, "r2_r4_diff", len(verify_rows), "new_names", len(new_names))
 
 
 def compact_is_minister(post: str) -> bool:

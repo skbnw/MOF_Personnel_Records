@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-v1.6 260513 の UI に更新データを差し込み
+v1.7 260513 の UI に更新データを差し込み
 - 追加: DATA / ENTRY_YEARS / TL_DATA / SUGGEST_DATA の差し替え
 - 追加: 名簿の在職中フィルタ、検索結果CSV出力
 - 追加: 役職年表の初期表示を最新年度（2026）起点、交代者は新しい順
 - 追加: 経歴一覧などの年度表示を 2025_R07年度 形式に統一
 - 追加: 起動時の名簿描画を年表データ定義後に回し、入省年次別の初期表示を現職事務次官の年次にする
+- 追加: 初期タブの役職年表も起動時に描画する
 - 継承: CSS・4タブUI・RANK_DEF・検索/詳細/年表のJS関数は原則維持
 """
 from __future__ import annotations
@@ -21,7 +22,7 @@ from lib.common import SRC_HTML, extract_js_literal, fy_fmt, unify_display  # no
 
 COMMENT_OLD = "v1.1 財務官僚名簿データベース"
 COMMENT_NEW = """<!--
-v1.6 財務官僚名簿データベース
+v1.7 財務官僚名簿データベース
 継承: 260513_MOFPersonnel Records / GitHub skbnw/MOF_Personnel_Records
 追加: 幹部名簿PDFによる令和5-8年度ポスト追記（代表日=各年度8月1日最近傍、令和8=2026-08-07）
 追加: 文字幅統一（半角カナ→全角）、ポスト表記のクレンジング、年度内の大臣・次官交代を日付付き表示
@@ -29,6 +30,7 @@ v1.6 財務官僚名簿データベース
 追加: 経歴一覧などの年度表示を 2025_R07年度 形式に統一
 追加: 出力CSV（名簿・経歴・年表）
 追加: 名簿描画を年表定義後に実行、入省年次別は現職事務次官年次を初期表示
+追加: 初期表示の役職年表を起動時に描画
 照合: 2022/2020/2016裏表紙xlsx
 -->
 """
@@ -229,6 +231,21 @@ def ensure_boot_fix(html: str) -> str:
         "if(id==='cohort'&&!cohortInited){cohortInited=true;}",
         "if(id==='cohort'&&!cohortInited){cohortInited=true;initCohortDefault();}",
     )
+    if "timelineInited=true;\nbuildTimelineFilters();\nrenderTimeline();" not in html:
+        html = _replace_once(
+            html,
+            "function showDetFromTimeline(id){\n"
+            "  switchTab('roster');\n"
+            "  setTimeout(()=>showDet(id),30);\n"
+            "}\n",
+            "function showDetFromTimeline(id){\n"
+            "  switchTab('roster');\n"
+            "  setTimeout(()=>showDet(id),30);\n"
+            "}\n"
+            "timelineInited=true;\n"
+            "buildTimelineFilters();\n"
+            "renderTimeline();\n",
+        )
     return html
 
 
@@ -389,7 +406,7 @@ def main(out_dir: Path) -> None:
     entry = json.loads((out_dir / "ENTRY_YEARS.json").read_text(encoding="utf-8"))
 
     html = SRC_HTML.read_text(encoding="utf-8")
-    if "v1.6 財務官僚名簿データベース" not in html:
+    if "v1.7 財務官僚名簿データベース" not in html:
         html = html.replace(
             html[html.find("<!--") : html.find("-->") + 3],
             COMMENT_NEW.strip(),
