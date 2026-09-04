@@ -2,11 +2,12 @@
 <html lang="ja">
 <head>
 <!--
-v1.3 財務官僚名簿データベース
+v1.4 財務官僚名簿データベース
 継承: 260513_MOFPersonnel Records / GitHub skbnw/MOF_Personnel_Records
 追加: 幹部名簿PDFによる令和5-8年度ポスト追記（代表日=各年度8月1日最近傍、令和8=2026-08-07）
 追加: 文字幅統一（半角カナ→全角）、ポスト表記のクレンジング、年度内の大臣・次官交代を日付付き表示
 追加: 役職年表は最新年度を起点、同一セルは新しい在任者を上に表示
+追加: 経歴一覧などの年度表示を 2025_R07年度 形式に統一
 照合: 2022/2020/2016裏表紙xlsx
 -->
 
@@ -68,7 +69,7 @@ td{padding:8px 12px;font-size:13px;white-space:nowrap;overflow:hidden;text-overf
 .career-list{list-style:none;}
 .ci{display:flex;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);align-items:flex-start;}
 .ci:last-child{border-bottom:none;}
-.ci-yr{color:var(--muted);font-size:11px;min-width:86px;flex-shrink:0;padding-top:1px;}
+.ci-yr{color:var(--muted);font-size:11px;min-width:108px;flex-shrink:0;padding-top:1px;}
 .ci-post{color:var(--text);font-size:13px;line-height:1.5;}
 .ci.latest .ci-yr{color:var(--accent2);}
 .ci.latest .ci-post{font-weight:500;}
@@ -363,7 +364,7 @@ function searchRoster(){
       '<td class="c-yomi">'+esc(d.r)+'</td>'+
       '<td class="c-univ">'+esc(d.u)+'</td>'+
       '<td class="c-post">'+esc(d.p)+'</td>'+
-      '<td class="c-fy">'+esc(d.fy)+'</td>'+
+      '<td class="c-fy">'+esc(fmtFy(d.fy))+'</td>'+
       '<td class="c-cnt">'+d.cnt+'</td>'+
       '</tr>');
   }
@@ -384,7 +385,7 @@ function showDet(id){
   if(d.h) tags.push('<span class="tag th">'+esc(d.h)+'</span>');
   document.getElementById('d-tags').innerHTML=tags.join('');
   document.getElementById('d-career').innerHTML=(d.career||[]).map((c,i)=>
-    '<li class="ci'+(i===0?' latest':'')+'"><span class="ci-yr">'+esc(c['年度'])+'</span><span class="ci-post">'+esc(c['ポスト'])+'</span></li>'
+    '<li class="ci'+(i===0?' latest':'')+'"><span class="ci-yr">'+esc(fmtFy(c['年度']))+'</span><span class="ci-post">'+esc(c['ポスト'])+'</span></li>'
   ).join('')||'<li class="ci"><span class="ci-post" style="color:var(--muted)">経歴データなし</span></li>';
   document.getElementById('det-pane').classList.add('open');
 }
@@ -491,7 +492,7 @@ function searchPost(){
       '<td class="pt-name">'+esc(d.n)+'</td>'+
       '<td class="pt-entry">'+esc(d.yf)+'</td>'+
       '<td class="pt-post">'+hlPost(post)+'</td>'+
-      '<td class="pt-yr">'+esc(year)+'</td>'+
+      '<td class="pt-yr">'+esc(fmtFy(year))+'</td>'+
       '</tr>');
   }
   if(deduped.length>1000) rows.push('<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:10px;font-size:12px">…表示上限1000件</td></tr>');
@@ -544,7 +545,7 @@ function renderCohort(){
       html+='<div class="person-card" onclick="openFromCohort('+d.id+')">'+
         '<span class="pc-name">'+esc(d.n)+'</span>'+
         '<span class="pc-post">'+esc(bestPost)+'</span>'+
-        '<span class="pc-year">'+esc(bestYear)+'</span>'+
+        '<span class="pc-year">'+esc(fmtFy(bestYear))+'</span>'+
         '</div>';
     });
     html+='</div>';
@@ -602,6 +603,11 @@ function resetTimeline(){
   renderTimeline();
 }
 
+function fmtFy(raw){
+  if(!raw) return '';
+  const y=(TL_YEARS||[]).find(x=>x.raw===raw);
+  return y&&y.fmt ? y.fmt+'年度' : raw;
+}
 function fmtTlCell(s){
   if(!s) return '';
   return String(s).split(/\n|→/).map(x=>x.trim()).filter(Boolean).reverse().map(esc).join('<br>');
