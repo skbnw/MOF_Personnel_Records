@@ -1,0 +1,7 @@
+venv/
+original_pdf/
+original_xlsx/
+output/
+__pycache__/
+*.pyc
+.cursor/
