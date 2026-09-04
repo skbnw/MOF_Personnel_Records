@@ -2,10 +2,11 @@
 <html lang="ja">
 <head>
 <!--
-v1.2 財務官僚名簿データベース
+v1.3 財務官僚名簿データベース
 継承: 260513_MOFPersonnel Records / GitHub skbnw/MOF_Personnel_Records
 追加: 幹部名簿PDFによる令和5-8年度ポスト追記（代表日=各年度8月1日最近傍、令和8=2026-08-07）
 追加: 文字幅統一（半角カナ→全角）、ポスト表記のクレンジング、年度内の大臣・次官交代を日付付き表示
+追加: 役職年表は最新年度を起点、同一セルは新しい在任者を上に表示
 照合: 2022/2020/2016裏表紙xlsx
 -->
 
@@ -586,8 +587,10 @@ function buildTimelineFilters(){
       el.appendChild(o);
     });
   });
-  const defFrom=TL_YEARS[Math.min(29,TL_YEARS.length-1)];
+  const defFrom=TL_YEARS[0];
+  const defTo=TL_YEARS[Math.min(29,TL_YEARS.length-1)];
   if(defFrom) fromEl.value=defFrom.raw;
+  if(defTo) toEl.value=defTo.raw;
   ['tl-era-from','tl-era-to'].forEach(id=>{
     document.getElementById(id).addEventListener('change',renderTimeline);
   });
@@ -599,6 +602,10 @@ function resetTimeline(){
   renderTimeline();
 }
 
+function fmtTlCell(s){
+  if(!s) return '';
+  return String(s).split(/\n|→/).map(x=>x.trim()).filter(Boolean).reverse().map(esc).join('<br>');
+}
 function renderTimeline(){
   const from=document.getElementById('tl-era-from').value;
   const to  =document.getElementById('tl-era-to').value;
@@ -621,11 +628,11 @@ function renderTimeline(){
     let tr='<tr><td class="td-year">'+esc(y.fmt)+'</td>';
     TL_ROLES.forEach(role=>{
       if(role==='政権'){
-        tr+='<td style="color:var(--accent3);font-size:12px;white-space:normal">'+esc(TL_SEIKEN[y.raw]||'').replace(/\n/g,'<br>')+'</td>';
+        tr+='<td style="color:var(--accent3);font-size:12px;white-space:normal">'+fmtTlCell(TL_SEIKEN[y.raw]||'')+'</td>';
       }else if(role==='財務大臣'){
-        tr+='<td style="color:#d4a0a0;font-size:12px;white-space:normal">'+esc(TL_DAIJIN[y.raw]||'').replace(/\n/g,'<br>')+'</td>';
+        tr+='<td style="color:#d4a0a0;font-size:12px;white-space:normal">'+fmtTlCell(TL_DAIJIN[y.raw]||'')+'</td>';
       }else{
-        const persons=row[role]||[];
+        const persons=(row[role]||[]).slice().reverse();
         tr+='<td>'+(persons.length===0
           ?'<span class="tl-empty">—</span>'
           :persons.map(p=>'<span class="tl-person" onclick="showDetFromTimeline('+p.id+')">'+esc(p.name)+'<span class="tp-entry">'+esc(p.yf)+(p.span?' '+esc(p.span):'')+'</span></span>').join('<br>')
