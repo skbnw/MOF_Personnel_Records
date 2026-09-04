@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-v1.5 260513 の UI に更新データを差し込み
+v1.6 260513 の UI に更新データを差し込み
 - 追加: DATA / ENTRY_YEARS / TL_DATA / SUGGEST_DATA の差し替え
 - 追加: 名簿の在職中フィルタ、検索結果CSV出力
 - 追加: 役職年表の初期表示を最新年度（2026）起点、交代者は新しい順
 - 追加: 経歴一覧などの年度表示を 2025_R07年度 形式に統一
-- 追加: 出力フォルダへ名簿・経歴・年表 CSV を書き出し、公開用 index.html をプロジェクト直下へコピー
+- 追加: 起動時の名簿描画を年表データ定義後に回し、入省年次別の初期表示を現職事務次官の年次にする
 - 継承: CSS・4タブUI・RANK_DEF・検索/詳細/年表のJS関数は原則維持
 """
 from __future__ import annotations
@@ -21,13 +21,14 @@ from lib.common import SRC_HTML, extract_js_literal, fy_fmt, unify_display  # no
 
 COMMENT_OLD = "v1.1 財務官僚名簿データベース"
 COMMENT_NEW = """<!--
-v1.5 財務官僚名簿データベース
+v1.6 財務官僚名簿データベース
 継承: 260513_MOFPersonnel Records / GitHub skbnw/MOF_Personnel_Records
 追加: 幹部名簿PDFによる令和5-8年度ポスト追記（代表日=各年度8月1日最近傍、令和8=2026-08-07）
 追加: 文字幅統一（半角カナ→全角）、ポスト表記のクレンジング、年度内の大臣・次官交代を日付付き表示
 追加: 役職年表は最新年度を起点、同一セルは新しい在任者を上に表示
 追加: 経歴一覧などの年度表示を 2025_R07年度 形式に統一
 追加: 出力CSV（名簿・経歴・年表）
+追加: 名簿描画を年表定義後に実行、入省年次別は現職事務次官年次を初期表示
 照合: 2022/2020/2016裏表紙xlsx
 -->
 """
@@ -180,6 +181,54 @@ def ensure_timeline_spans(html: str) -> str:
         "+'</span></span>').join('<br>')"
     )
     html = _replace_once(html, old, new)
+    return html
+
+
+def ensure_boot_fix(html: str) -> str:
+    html = _replace_once(
+        html,
+        "buildFilters();\nsearchRoster();\n\n// ===== 役職年表 =====",
+        "buildFilters();\n\n// ===== 役職年表 =====",
+    )
+    html = _replace_once(
+        html,
+        "function fmtFy(raw){\n"
+        "  if(!raw) return '';\n"
+        "  const y=(TL_YEARS||[]).find(x=>x.raw===raw);\n"
+        "  return y&&y.fmt ? y.fmt+'年度' : raw;\n"
+        "}\n",
+        "const FY_FMT={};\n"
+        "(TL_YEARS||[]).forEach(y=>{if(y.raw&&y.fmt) FY_FMT[y.raw]=y.fmt;});\n"
+        "function fmtFy(raw){\n"
+        "  if(!raw) return '';\n"
+        "  const f=FY_FMT[raw];\n"
+        "  return f?f+'年度':raw;\n"
+        "}\n"
+        "function currentJikanYear(){\n"
+        "  const fy=(TL_YEARS[0]||{}).raw;\n"
+        "  const list=((TL_MAP[fy]||{})['事務次官']||[]);\n"
+        "  const cur=list[list.length-1];\n"
+        "  if(!cur) return '';\n"
+        "  const person=DATA.find(d=>d.id===cur.id);\n"
+        "  return (person&&person.y)||'';\n"
+        "}\n"
+        "function initCohortDefault(){\n"
+        "  const y=currentJikanYear();\n"
+        "  const el=document.getElementById('c-year');\n"
+        "  if(y&&el){el.value=y;renderCohort();}\n"
+        "}\n",
+    )
+    if "searchRoster();\ninitCohortDefault();" not in html:
+        html = _replace_once(
+            html,
+            "function renderTimeline(){",
+            "searchRoster();\ninitCohortDefault();\nfunction renderTimeline(){",
+        )
+    html = _replace_once(
+        html,
+        "if(id==='cohort'&&!cohortInited){cohortInited=true;}",
+        "if(id==='cohort'&&!cohortInited){cohortInited=true;initCohortDefault();}",
+    )
     return html
 
 
@@ -340,7 +389,7 @@ def main(out_dir: Path) -> None:
     entry = json.loads((out_dir / "ENTRY_YEARS.json").read_text(encoding="utf-8"))
 
     html = SRC_HTML.read_text(encoding="utf-8")
-    if "v1.5 財務官僚名簿データベース" not in html:
+    if "v1.6 財務官僚名簿データベース" not in html:
         html = html.replace(
             html[html.find("<!--") : html.find("-->") + 3],
             COMMENT_NEW.strip(),
@@ -350,6 +399,7 @@ def main(out_dir: Path) -> None:
     html = ensure_roster_extras(html)
     html = ensure_timeline_spans(html)
     html = ensure_fy_display(html)
+    html = ensure_boot_fix(html)
     html = unify_embedded_univ_order(html)
     suggest = [
         {"cat": x.get("cat") or "", "items": [unify_display(i) for i in (x.get("items") or [])]}
